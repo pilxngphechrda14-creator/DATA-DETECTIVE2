@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DATA DETECTIVE: นักสืบพิชิตข้อมูล</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons for game UI elements -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --dark-bg: #050a15;
+            --glass-bg: rgba(10, 20, 40, 0.6);
+            --glass-border: rgba(0, 243, 255, 0.2);
+        }
+
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: var(--dark-bg);
+            color: #e2e8f0;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(188, 19, 254, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 243, 255, 0.05), transparent 25%);
+        }
+
+        .font-cyber {
+            font-family: 'Chakra Petch', sans-serif;
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Neon Buttons */
+        .btn-neon {
+            background: linear-gradient(45deg, transparent 5%, rgba(0, 243, 255, 0.1) 5%);
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.2), 0 0 10px rgba(0, 243, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-neon:hover {
+            background: rgba(0, 243, 255, 0.2);
+            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.5);
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        .btn-neon-purple {
+            border: 1px solid var(--neon-purple);
+            color: #eab308; /* Yellow text for contrast */
+            box-shadow: inset 0 0 10px rgba(188, 19, 254, 0.2), 0 0 10px rgba(188, 19, 254, 0.2);
+        }
+
+        .btn-neon-purple:hover {
+            background: rgba(188, 19, 254, 0.2);
+            box-shadow: inset 0 0 20px rgba(188, 19, 254, 0.5), 0 0 20px rgba(188, 19, 254, 0.5);
+        }
+
+        /* Scanline Overlay */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.3;
+        }
+
+        /* Animations */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; box-shadow: 0 0 15px var(--neon-blue); }
+            50% { opacity: 0.7; box-shadow: 0 0 5px var(--neon-blue); }
+        }
+        .animate-pulse-glow { animation: pulse-glow 2s infinite; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+        /* Logic Grid Specifics */
+        .logic-grid-cell {
+            width: 44px; height: 44px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .logic-grid-cell:hover { background: rgba(0, 243, 255, 0.1); }
+        .cell-state-x { color: #ff3366; text-shadow: 0 0 8px #ff3366; }
+        .cell-state-o { color: #00ff66; text-shadow: 0 0 8px #00ff66; }
+
+        /* Clue Item */
+        .clue-item { transition: all 0.3s; }
+        .clue-item.pinned { border-color: var(--neon-purple); box-shadow: 0 0 10px rgba(188, 19, 254, 0.3); }
+        .clue-item.eliminated { opacity: 0.4; text-decoration: line-through; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 3px; }
+
+        /* Hide elements utility */
+        .screen { display: none; }
+        .screen.active { display: flex; }
+    </style>
+</head>
+<body class="min-h-screen text-slate-200 relative flex flex-col">
+
+    <div class="scanlines"></div>
+
+    <header id="global-header" class="hidden p-4 glass-panel m-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-3">
+            <i class="ph ph-detective text-3xl text-cyan-400"></i>
+            <div>
+                <h1 class="font-cyber font-bold text-xl text-cyan-400 leading-none">DATA DETECTIVE</h1>
+                <span id="header-player-rank" class="text-xs text-purple-400">Rookie</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 font-cyber">
+            <div class="flex items-center gap-1 text-yellow-400" title="Score">
+                <i class="ph-fill ph-star"></i> <span id="header-score">0</span>
+            </div>
+            <button onclick="toggleSound()" class="text-cyan-400 hover:text-white transition">
+                <i id="sound-icon" class="ph-fill ph-speaker-high text-xl"></i>
+            </button>
+            <button onclick="navTo('home')" class="p-2 rounded hover:bg-slate-800 transition">
+                <i class="ph ph-house text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center relative w-full max-w-6xl mx-auto p-4 z-10">
+
+        <!-- ==================== HOME SCREEN ==================== -->
+        <section id="screen-home" class="screen active flex-col items-center text-center w-full max-w-lg glass-panel p-8 fade-in">
+            <div class="mb-6 relative">
+                <i class="ph ph-fingerprint text-7xl text-cyan-400 animate-pulse-glow rounded-full p-4 border border-cyan-500/30"></i>
+                <div class="absolute inset-0 border-2 border-cyan-400 rounded-full animate-ping opacity-20"></div>
+            </div>
+            
+            <h1 class="font-cyber text-5xl font-bold mb-2 tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">
+                DATA DETECTIVE
+            </h1>
+            <p class="text-cyan-100/70 mb-8 tracking-widest text-sm">"ทุกข้อมูลมีความจริงซ่อนอยู่"</p>
+
+            <div class="flex flex-col gap-4 w-full font-cyber text-lg">
+                <button onclick="navTo('cases')" class="btn-neon py-3 px-6 rounded font-bold flex items-center justify-center gap-2">
+                    <i class="ph ph-play"></i> START INVESTIGATION
+                </button>
+                <button onclick="navTo('profile')" class="glass-panel py-3 px-6 hover:bg-white/5 transition flex items-center justify-center gap-2">
+                    <i class="ph ph-user-focus"></i> PLAYER PROFILE
+                </button>
+                <button onclick="navTo('leaderboard')" class="glass-panel py-3 px-6 hover:bg-white/5 transition flex items-center justify-center gap-2">
+                    <i class="ph ph-trophy"></i> LEADERBOARD
+                </button>
+            </div>
+        </section>
+
+        <!-- ==================== PROFILE SCREEN ==================== -->
+        <section id="screen-profile" class="screen flex-col w-full max-w-2xl glass-panel p-8 fade-in">
+            <div class="flex justify-between items-center mb-6 border-b border-cyan-500/30 pb-4">
+                <h2 class="font-cyber text-3xl text-cyan-400"><i class="ph ph-identification-card"></i> DETECTIVE ID</h2>
+                <button onclick="navTo('home')" class="text-gray-400 hover:text-white"><i class="ph ph-x text-2xl"></i></button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="col-span-1 flex flex-col items-center justify-center bg-black/30 p-4 rounded-lg border border-purple-500/20">
+                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Detective&backgroundColor=transparent" alt="Avatar" class="w-32 h-32 mb-4 bg-slate-800 rounded-full border-2 border-cyan-400">
+                    <h3 class="font-cyber text-xl font-bold" id="profile-name">Player_01</h3>
+                    <p class="text-purple-400 font-cyber" id="profile-rank">Rookie</p>
+                </div>
+                <div class="col-span-2 grid grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border border-cyan-500/20">
+                        <p class="text-sm text-gray-400">SCORE</p>
+                        <p class="font-cyber text-2xl text-yellow-400" id="profile-score">0</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border border-cyan-500/20">
+                        <p class="text-sm text-gray-400">CASES SOLVED</p>
+                        <p class="font-cyber text-2xl text-cyan-400" id="profile-cases">0 / 10</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border border-cyan-500/20">
+                        <p class="text-sm text-gray-400">STARS EARNED</p>
+                        <p class="font-cyber text-2xl text-yellow-400" id="profile-stars">0</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border border-cyan-500/20">
+                        <p class="text-sm text-gray-400">TIME PLAYED</p>
+                        <p class="font-cyber text-2xl text-purple-400" id="profile-time">00:00</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== LEADERBOARD SCREEN ==================== -->
+        <section id="screen-leaderboard" class="screen flex-col w-full max-w-2xl glass-panel p-8 fade-in">
+             <div class="flex justify-between items-center mb-6 border-b border-cyan-500/30 pb-4">
+                <h2 class="font-cyber text-3xl text-yellow-400"><i class="ph ph-ranking"></i> ARCHIVE RANKING</h2>
+                <button onclick="navTo('home')" class="text-gray-400 hover:text-white"><i class="ph ph-x text-2xl"></i></button>
+            </div>
+            <div class="flex flex-col gap-2 font-cyber" id="leaderboard-list">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- ==================== CASE SELECT SCREEN ==================== -->
+        <section id="screen-cases" class="screen flex-col w-full max-w-5xl fade-in">
+            <div class="text-center mb-8">
+                <h2 class="font-cyber text-4xl text-cyan-400 mb-2">CASE ARCHIVES</h2>
+                <p class="text-gray-400">เลือกแฟ้มคดีเพื่อเริ่มการสืบสวนและวิเคราะห์ข้อมูล</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="case-grid">
+                <!-- Cases generated by JS -->
+            </div>
+        </section>
+
+        <!-- ==================== GAMEPLAY SCREEN ==================== -->
+        <section id="screen-game" class="screen flex-col w-full max-w-6xl h-full fade-in gap-4">
+            
+            <!-- Game Header Bar -->
+            <div class="glass-panel p-4 flex justify-between items-center w-full">
+                <div class="flex flex-col">
+                    <span class="text-cyan-400 font-cyber font-bold text-xl" id="game-case-title">CASE 01</span>
+                    <span class="text-xs text-gray-400" id="game-case-desc">Description</span>
+                </div>
+                
+                <div class="flex items-center gap-6">
+                    <!-- Lives -->
+                    <div class="flex items-center gap-1 text-red-500 text-xl" id="game-lives">
+                        <i class="ph-fill ph-heart"></i><i class="ph-fill ph-heart"></i><i class="ph-fill ph-heart"></i>
+                    </div>
+                    <!-- Timer -->
+                    <div class="flex items-center gap-2 bg-black/40 px-4 py-1 rounded border border-cyan-500/30 font-cyber text-xl">
+                        <i class="ph ph-timer text-cyan-400"></i>
+                        <span id="game-timer" class="text-white w-16 text-center">05:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Workspace -->
+            <div class="flex flex-col lg:flex-row gap-4 flex-grow h-full min-h-[500px]">
+                
+                <!-- Left Panel: Clues & Tools -->
+                <div class="w-full lg:w-1/3 flex flex-col gap-4">
+                    <div class="glass-panel p-4 flex-grow flex flex-col h-full max-h-[60vh] overflow-y-auto relative">
+                        <h3 class="font-cyber text-purple-400 text-lg border-b border-purple-500/30 pb-2 mb-3 flex justify-between">
+                            <span><i class="ph ph-folder-open"></i> EVIDENCES & CLUES</span>
+                            <span class="text-xs bg-purple-900/50 px-2 py-1 rounded">ข้อมูลดิบ</span>
+                        </h3>
+                        <p class="text-xs text-gray-400 mb-2">คำแนะนำ: คลิก 📌 เพื่อปักหมุดข้อมูลสำคัญ, คลิก 👁️ เพื่อขีดฆ่าข้อมูลที่ใช้แล้ว</p>
+                        
+                        <div id="clues-container" class="flex flex-col gap-2">
+                            <!-- Clues populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Hint System -->
+                    <div class="glass-panel p-4 border-yellow-500/30">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-cyber text-yellow-400"><i class="ph ph-lightbulb"></i> SYSTEM ASSIST</h3>
+                            <span class="text-xs text-gray-400">ใช้ Hint จะลดคะแนน</span>
+                        </div>
+                        <div class="flex gap-2" id="hint-buttons">
+                            <button onclick="useHint(1)" class="flex-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 py-1 rounded text-sm transition">Hint 1</button>
+                            <button onclick="useHint(2)" class="flex-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 py-1 rounded text-sm transition">Hint 2</button>
+                            <button onclick="useHint(3)" class="flex-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 py-1 rounded text-sm transition">Hint 3</button>
+                        </div>
+                        <div id="hint-display" class="mt-2 text-sm text-yellow-100 hidden bg-black/40 p-2 rounded border border-yellow-500/20"></div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: The Logic/Workspace Area -->
+                <div class="w-full lg:w-2/3 glass-panel p-6 flex flex-col relative">
+                    <h3 class="font-cyber text-cyan-400 text-xl border-b border-cyan-500/30 pb-2 mb-4">
+                        <i class="ph ph-projector-screen"></i> ANALYSIS BOARD
+                    </h3>
+                    
+                    <div class="flex-grow flex flex-col items-center justify-center relative w-full overflow-x-auto">
+                        <p class="text-sm text-gray-300 mb-6 text-center max-w-lg bg-blue-900/20 p-3 rounded border border-blue-500/20">
+                            วิเคราะห์ข้อมูลจากเบาะแสซ้ายมือ แล้วทำการเชื่อมโยงข้อมูลในตารางด้านล่าง<br>
+                            <span class="text-xs text-gray-400">คลิกที่ช่องเพื่อเปลี่ยนสถานะ: [ว่าง] ➔ ❌ (ไม่เกี่ยว) ➔ ✔️ (ใช่)</span>
+                        </p>
+
+                        <!-- LOGIC GRID INJECTED HERE -->
+                        <div id="logic-workspace" class="bg-black/30 p-4 rounded-xl border border-cyan-500/30 shadow-[0_0_20px_rgba(0,243,255,0.1)]">
+                            <!-- JS Generates Grid -->
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end w-full border-t border-cyan-500/30 pt-4">
+                        <button onclick="checkAnswer()" class="btn-neon font-cyber text-xl py-3 px-8 rounded-lg shadow-lg flex items-center gap-2">
+                            <i class="ph ph-magnifying-glass"></i> SOLVE CASE
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== RESULT SCREEN ==================== -->
+        <section id="screen-result" class="screen flex-col items-center justify-center w-full max-w-2xl glass-panel p-8 text-center fade-in absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            <h1 id="result-title" class="font-cyber text-5xl font-bold mb-2 text-cyan-400 drop-shadow-[0_0_10px_cyan]">CASE CLOSED</h1>
+            
+            <div class="flex gap-2 my-6 text-4xl text-gray-700" id="result-stars">
+                <!-- Stars JS -->
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 w-full mb-6 font-cyber text-lg">
+                <div class="bg-black/40 p-3 rounded border border-cyan-500/30">
+                    <span class="text-gray-400 text-sm block">SCORE</span>
+                    <span id="result-score" class="text-yellow-400 text-2xl font-bold">+0</span>
+                </div>
+                <div class="bg-black/40 p-3 rounded border border-cyan-500/30">
+                    <span class="text-gray-400 text-sm block">TIME USED</span>
+                    <span id="result-time" class="text-cyan-400 text-2xl font-bold">00:00</span>
+                </div>
+            </div>
+
+            <!-- Educational Feedback Section -->
+            <div class="bg-purple-900/20 border border-purple-500/30 p-5 rounded-lg mb-8 text-left w-full">
+                <h3 class="font-cyber text-purple-400 text-lg mb-2"><i class="ph ph-brain"></i> การวิเคราะห์ทางวิทยาการคำนวณ:</h3>
+                <p id="result-learning" class="text-sm text-purple-100 leading-relaxed"></p>
+            </div>
+
+            <div class="flex gap-4 w-full">
+                <button onclick="navTo('cases')" class="flex-1 glass-panel py-3 hover:bg-white/10 transition font-cyber">BACK TO ARCHIVES</button>
+                <button id="next-case-btn" class="flex-1 btn-neon py-3 rounded font-cyber">NEXT CASE <i class="ph ph-arrow-right"></i></button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- UI Overlay for Toast Notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 flex flex-col gap-2 z-[100]"></div>
+
+    <script>
+        // --- 1. GAME DATA & CASES ---
+        const cases = [
+            {
+                id: 1,
+                title: "CASE 01 — Missing Laptop 💻",
+                difficulty: "Easy",
+                desc: "คอมพิวเตอร์ในห้องทดลองถูกสลับเครื่องกัน หน้าที่ของคุณคือหาว่าใครใช้เครื่องไหน",
+                timeLimit: 300, // 5 minutes
+                type: "logic-grid",
+                learningObjective: "คุณได้ฝึก 'การเชื่อมโยงข้อมูล' และ 'การตัดตัวเลือก (Process of Elimination)' โดยการนำข้อมูลที่ไม่เกี่ยวข้องกันมาเชื่อมต่อกันเพื่อหาข้อเท็จจริงเพียงหนึ่งเดียว นี่คือพื้นฐานสำคัญของการคิดเชิงตรรกะ",
+                entities: {
+                    rows: ["นนท์", "มิน", "ฟ้า", "เจมส์"], // People
+                    cols: ["เครื่อง A", "เครื่อง B", "เครื่อง C", "เครื่อง D"] // Items
+                },
+                // Solution mapping rows to cols index
+                solution: { "นนท์": 2, "มิน": 1, "ฟ้า": 0, "เจมส์": 3 }, // Non:C, Min:B, Fah:A, James:D
+                clues: [
+                    { id: 1, text: "ระบบ Log ของเซิร์ฟเวอร์บันทึกไว้ชัดเจนว่า 'เจมส์' เชื่อมต่อผ่าน 'เครื่อง D' ตลอดเวลา" },
+                    { id: 2, text: "พยานที่เดินผ่านหน้าห้องยืนยันว่าเห็น 'นนท์' กำลังพิมพ์งานอยู่หน้า 'เครื่อง C'" },
+                    { id: 3, text: "'มิน' ให้การว่าตัวเองไม่ได้แตะ 'เครื่อง A' เลยแม้แต่น้อย" },
+                    { id: 4, text: "(เบาะแสหลอก) มีสติกเกอร์รูปแมวสีชมพูติดอยู่ที่หลังเครื่อง B" }
+                ],
+                hints: [
+                    "ลองใส่เครื่องหมาย ✔️ ให้กับข้อมูลที่ยืนยันแน่ชัดแล้วก่อน (เช่น เจมส์ และ นนท์)",
+                    "ถ้าช่องไหนเป็น ✔️ แล้ว ช่องอื่นในแถวและคอลัมน์เดียวกันต้องเป็น ❌ ทั้งหมด",
+                    "เมื่อรู้เครื่องของ เจมส์ และ นนท์ แล้ว จะเหลือเครื่อง A กับ B มินบอกว่าไม่ได้ใช้ A ดังนั้น..."
+                ]
+            },
+            {
+                id: 2,
+                title: "CASE 02 — Mystery Pet 🐱",
+                difficulty: "Medium",
+                desc: "ค้นหาว่าผู้ต้องสงสัยแต่ละคนเลี้ยงสัตว์ชนิดใด จากข้อมูลโซเชียลมีเดีย",
+                timeLimit: 240,
+                type: "logic-grid",
+                learningObjective: "ในคดีนี้ คุณได้ฝึก 'การวิเคราะห์เงื่อนไขซ้อนทับ' ข้อมูลไม่ได้บอกตรงๆ แต่คุณต้องอาศัยการอนุมาน (Inference) จากกฎที่คุณสร้างขึ้นในตาราง",
+                entities: {
+                    rows: ["แอน", "บอย", "แคท", "ดิว"],
+                    cols: ["หมา", "แมว", "นก", "ปลา"]
+                },
+                solution: { "แอน": 1, "บอย": 0, "แคท": 3, "ดิว": 2 }, // Ann:Cat, Boy:Dog, Cat:Fish, Dew:Bird
+                clues: [
+                    { id: 1, text: "คนที่เลี้ยง 'นก' โพสต์บ่นว่าเพื่อนชื่อ 'บอย' ชอบพาสัตว์เลี้ยงมาเห่ากวน" },
+                    { id: 2, text: "'แอน' แพ้ขนสุนัขและขนนกอย่างรุนแรง" },
+                    { id: 3, text: "'แคท' อาศัยอยู่ในคอนโดที่ห้ามเลี้ยงสัตว์ครึ่งบกครึ่งน้ำ หรือสัตว์มีขนเด็ดขาด" },
+                    { id: 4, text: "'ดิว' ซื้อกรงนกอันใหม่เมื่อวานนี้" }
+                ],
+                hints: [
+                    "จากเบาะแสแรก บอยต้องเลี้ยงอะไรที่ 'เห่า' ได้?",
+                    "พิจารณาข้อจำกัดของ แคท (ห้ามสัตว์มีขน) จะเหลือตัวเลือกอะไรให้แคทเลี้ยง?",
+                    "ถ้าดิวซื้อกรงนก แปลว่าดิวต้องเลี้ยงนก แอนที่แพ้ขนจะเหลือตัวเลือกอะไร?"
+                ]
+            },
+            // Mocking Case 3-10 to show UI capability
+            { id: 3, title: "CASE 03 — Secret Message 🔐", difficulty: "Medium", locked: true },
+            { id: 4, title: "CASE 04 — The Missing Student", difficulty: "Hard", locked: true },
+            { id: 5, title: "CASE 05 — Data Fraud 📊", difficulty: "Hard", locked: true },
+            { id: 6, title: "CASE 06 — Cyber Mystery", difficulty: "Hard", locked: true },
+            { id: 7, title: "CASE 07 — Fake Information", difficulty: "Hard", locked: true },
+            { id: 8, title: "CASE 08 — Hidden Pattern", difficulty: "Expert", locked: true },
+            { id: 9, title: "CASE 09 — Digital Thief", difficulty: "Expert", locked: true },
+            { id: 10, title: "CASE 10 — THE FINAL CASE 🔥", difficulty: "Master", locked: true }
+        ];
+
+        // --- 2. GAME STATE ---
+        const gameState = {
+            currentScreen: 'home',
+            player: {
+                name: "Rookie_" + Math.floor(Math.random() * 9000 + 1000),
+                rank: "Rookie 🔰",
+                score: 0,
+                stars: 0,
+                casesSolved: 0,
+                timeSpent: 0 // in seconds
+            },
+            progress: {
+                // e.g. 1: { stars: 3, score: 500 }
+            },
+            sound: true,
+            // Active Game Variables
+            activeCaseId: null,
+            timerInterval: null,
+            timeRemaining: 0,
+            lives: 3,
+            hintsUsed: 0,
+            gridState: {} // e.g. "rowIdx-colIdx": 0 (empty), 1 (X), 2 (O)
+        };
+
+        // --- STREAMING_CHUNK:Audio System Synthesis ---
+        // Simple Audio Synthesizer to avoid external file dependencies
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (!gameState.sound || audioCtx.state === 'suspended') return;
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'pin') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+        }
+
+        function toggleSound() {
+            gameState.sound = !gameState.sound;
+            const icon = document.getElementById('sound-icon');
+            if (gameState.sound) {
+                icon.className = "ph-fill ph-speaker-high text-xl";
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                playSound('click');
+            } else {
+                icon.className = "ph-fill ph-speaker-slash text-xl text-gray-500";
+            }
+        }
+
+        // --- STREAMING_CHUNK:Navigation & Utility Functions ---
+        
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateRank() {
+            const scores = gameState.player.score;
+            if (scores >= 5000) gameState.player.rank = "Data Master 👑";
+            else if (scores >= 3000) gameState.player.rank = "Master Detective 🧠";
+            else if (scores >= 1500) gameState.player.rank = "Detective 🕵️";
+            else if (scores >= 500) gameState.player.rank = "Investigator 🔎";
+            
+            document.getElementById('header-player-rank').innerText = gameState.player.rank;
+        }
+
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            const colors = {
+                info: 'bg-blue-900/80 border-blue-400 text-blue-200',
+                success: 'bg-green-900/80 border-green-400 text-green-200',
+                error: 'bg-red-900/80 border-red-400 text-red-200',
+                warning: 'bg-yellow-900/80 border-yellow-400 text-yellow-200'
+            };
+            toast.className = `p-3 rounded border backdrop-blur-md shadow-lg fade-in ${colors[type]}`;
+            toast.innerText = msg;
+            
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }
+
+        function navTo(screenId) {
+            playSound('click');
+            
+            // Clean up intervals if leaving game
+            if (screenId !== 'game' && gameState.timerInterval) {
+                clearInterval(gameState.timerInterval);
+            }
+
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById(`screen-${screenId}`);
+            if(target) {
+                target.classList.add('active');
+            }
+
+            // Header visibility
+            const header = document.getElementById('global-header');
+            if (screenId === 'home') {
+                header.classList.add('hidden');
+            } else {
+                header.classList.remove('hidden');
+                document.getElementById('header-score').innerText = gameState.player.score;
+            }
+
+            // Screen specific initialization
+            if (screenId === 'cases') initCaseSelect();
+            if (screenId === 'profile') initProfile();
+            if (screenId === 'leaderboard') initLeaderboard();
+        }
+
+        // --- STREAMING_CHUNK:Screen Initializers (Profile, Cases, Leaderboard) ---
+
+        function initProfile() {
+            document.getElementById('profile-name').innerText = gameState.player.name;
+            document.getElementById('profile-rank').innerText = gameState.player.rank;
+            document.getElementById('profile-score').innerText = gameState.player.score;
+            document.getElementById('profile-cases').innerText = `${gameState.player.casesSolved} / ${cases.length}`;
+            document.getElementById('profile-stars').innerText = gameState.player.stars;
+            document.getElementById('profile-time').innerText = formatTime(gameState.player.timeSpent);
+        }
+
+        function initLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = '';
+            
+            // Mock Data + Player
+            const data = [
+                { name: "NeonSherlock", score: 8540, rank: "Data Master 👑" },
+                { name: "CyberHound", score: 6200, rank: "Master Detective 🧠" },
+                { name: "ByteTracker", score: 3450, rank: "Detective 🕵️" },
+                { name: gameState.player.name, score: gameState.player.score, rank: gameState.player.rank, isPlayer: true }
+            ];
+            
+            data.sort((a, b) => b.score - a.score);
+            
+            data.forEach((p, index) => {
+                const isP = p.isPlayer ? 'border-cyan-400 bg-cyan-900/30' : 'border-gray-700 bg-black/40';
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index+1}.`;
+                
+                list.innerHTML += `
+                    <div class="flex justify-between items-center p-3 rounded border ${isP} transition hover:bg-white/5">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl w-6 text-center">${medal}</span>
+                            <div>
+                                <span class="${p.isPlayer ? 'text-cyan-400 font-bold' : 'text-gray-200'}">${p.name}</span>
+                                <span class="text-xs text-gray-500 block">${p.rank}</span>
+                            </div>
+                        </div>
+                        <span class="text-yellow-400 font-bold">${p.score}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function initCaseSelect() {
+            const grid = document.getElementById('case-grid');
+            grid.innerHTML = '';
+
+            cases.forEach((c, index) => {
+                // For logic simple logic, Case 1 & 2 are unlocked. Others locked unless previous is solved.
+                const isLocked = c.locked && !gameState.progress[c.id - 1]; 
+                const progress = gameState.progress[c.id];
+                
+                let starsHTML = '';
+                if (progress) {
+                    for(let i=0; i<3; i++) {
+                        starsHTML += `<i class="ph-fill ph-star ${i < progress.stars ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
+                    }
+                } else if (!isLocked) {
+                    starsHTML = '<span class="text-xs text-cyan-400">UNTESTED</span>';
+                } else {
+                    starsHTML = '<i class="ph-fill ph-lock-key text-gray-500 text-xl"></i>';
+                }
+
+                const bgClass = isLocked ? 'bg-slate-900/50 border-gray-800' : 
+                              progress ? 'bg-green-900/20 border-green-500/30' : 
+                              'bg-cyan-900/20 border-cyan-500/50 hover:shadow-[0_0_15px_rgba(0,243,255,0.2)] cursor-pointer';
+
+                const html = `
+                    <div class="glass-panel p-5 relative overflow-hidden transition-all ${bgClass}" 
+                         ${!isLocked ? `onclick="startGame(${c.id})"` : ''}>
+                        ${isLocked ? '<div class="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-10"></div>' : ''}
+                        
+                        <div class="flex justify-between items-start mb-2 relative z-20">
+                            <h3 class="font-cyber font-bold ${isLocked ? 'text-gray-500' : 'text-cyan-300'}">${c.title}</h3>
+                            <div class="flex">${starsHTML}</div>
+                        </div>
+                        
+                        <div class="text-xs ${isLocked ? 'text-gray-600' : 'text-gray-400'} mb-4 h-10 overflow-hidden line-clamp-2">
+                            ${c.desc || 'Requires higher clearance.'}
+                        </div>
+                        
+                        <div class="flex justify-between items-center mt-auto relative z-20">
+                            <span class="text-xs ${c.difficulty === 'Easy'? 'text-green-400' : c.difficulty==='Medium'?'text-yellow-400':'text-red-400'}">
+                                ${c.difficulty}
+                            </span>
+                            ${!isLocked && !progress ? '<span class="btn-neon text-xs px-2 py-1 rounded">OPEN</span>' : ''}
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += html;
+            });
+        }
+
+        // --- STREAMING_CHUNK:Gameplay Engine (Setup & UI) ---
+
+        function startGame(caseId) {
+            playSound('success');
+            
+            // Audio context requires user gesture to start in some browsers, this ensures it.
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+
+            const caseData = cases.find(c => c.id === caseId);
+            if (!caseData || caseData.locked && !gameState.progress[caseId-1]) {
+                showToast("แฟ้มคดีนี้ถูกล็อกอยู่", "error");
+                return;
+            }
+
+            // Reset Game State
+            gameState.activeCaseId = caseId;
+            gameState.lives = 3;
+            gameState.hintsUsed = 0;
+            gameState.gridState = {};
+            gameState.timeRemaining = caseData.timeLimit;
+            
+            // Setup UI
+            document.getElementById('game-case-title').innerText = caseData.title;
+            document.getElementById('game-case-desc').innerText = caseData.desc;
+            updateLivesUI();
+            updateTimerUI();
+            renderClues(caseData.clues);
+            
+            // Hide hints text, reset buttons
+            document.getElementById('hint-display').classList.add('hidden');
+            document.getElementById('hint-display').innerText = '';
+            document.querySelectorAll('#hint-buttons button').forEach(btn => btn.classList.remove('opacity-50', 'cursor-not-allowed'));
+
+            // Render Logic Workspace
+            if (caseData.type === 'logic-grid') {
+                renderLogicGrid(caseData.entities);
+            }
+
+            navTo('game');
+
+            // Start Timer
+            gameState.timerInterval = setInterval(() => {
+                gameState.timeRemaining--;
+                gameState.player.timeSpent++;
+                updateTimerUI();
+
+                if(gameState.timeRemaining <= 30 && gameState.timeRemaining > 0) {
+                    document.getElementById('game-timer').classList.add('text-red-500', 'animate-pulse');
+                    if(gameState.timeRemaining % 5 === 0) playSound('error'); // Soft warning beep
+                }
+
+                if (gameState.timeRemaining <= 0) {
+                    clearInterval(gameState.timerInterval);
+                    handleGameOver("หมดเวลา! แฟ้มคดีถูกปิด");
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            const timerEl = document.getElementById('game-timer');
+            timerEl.innerText = formatTime(gameState.timeRemaining);
+            if(gameState.timeRemaining > 30) {
+                timerEl.classList.remove('text-red-500', 'animate-pulse');
+                timerEl.classList.add('text-white');
+            }
+        }
+
+        function updateLivesUI() {
+            const container = document.getElementById('game-lives');
+            container.innerHTML = '';
+            for(let i=0; i<3; i++) {
+                if (i < gameState.lives) {
+                    container.innerHTML += '<i class="ph-fill ph-heart text-red-500 drop-shadow-[0_0_5px_red]"></i>';
+                } else {
+                    container.innerHTML += '<i class="ph ph-heart text-gray-600"></i>';
+                }
+            }
+        }
+
+        // --- STREAMING_CHUNK:Gameplay Engine (Clues & Interactions) ---
+
+        function renderClues(clues) {
+            const container = document.getElementById('clues-container');
+            container.innerHTML = '';
+            clues.forEach(c => {
+                const el = document.createElement('div');
+                el.className = 'clue-item bg-black/40 border border-purple-500/20 p-3 rounded text-sm flex gap-3 group';
+                el.innerHTML = `
+                    <div class="flex flex-col gap-2">
+                        <button onclick="togglePin(this)" class="text-gray-500 hover:text-purple-400" title="Pin"><i class="ph-fill ph-push-pin text-lg"></i></button>
+                        <button onclick="toggleEliminate(this.parentElement.parentElement)" class="text-gray-500 hover:text-red-400" title="Mark Used"><i class="ph-fill ph-eye-slash text-lg"></i></button>
+                    </div>
+                    <div class="text-purple-100 flex-grow pt-1">${c.text}</div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function togglePin(btn) {
+            playSound('pin');
+            const item = btn.parentElement.parentElement;
+            item.classList.toggle('pinned');
+            btn.classList.toggle('text-purple-400');
+            btn.classList.toggle('text-gray-500');
+        }
+
+        function toggleEliminate(item) {
+            playSound('click');
+            item.classList.toggle('eliminated');
+        }
+
+        function useHint(level) {
+            const currentCase = cases.find(c => c.id === gameState.activeCaseId);
+            if (!currentCase.hints || currentCase.hints.length < level) return;
+            
+            // Only use sequentially for logic simplicity
+            if (level > gameState.hintsUsed + 1) {
+                showToast("กรุณาใช้ Hint ตามลำดับ", "warning");
+                return;
+            }
+
+            if (gameState.hintsUsed < level) {
+                playSound('success');
+                gameState.hintsUsed = level;
+                
+                // Show hint text
+                const display = document.getElementById('hint-display');
+                display.classList.remove('hidden');
+                display.innerText = `Hint ${level}: ${currentCase.hints[level-1]}`;
+                
+                // Dim button
+                const btn = document.querySelectorAll('#hint-buttons button')[level-1];
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                showToast("-50 คะแนน (ใช้ระบบตัวช่วย)", "warning");
+            }
+        }
+
+        // --- STREAMING_CHUNK:Gameplay Engine (Logic Grid Specific) ---
+
+        function renderLogicGrid(entities) {
+            const ws = document.getElementById('logic-workspace');
+            ws.innerHTML = '';
+
+            const table = document.createElement('table');
+            table.className = "border-collapse border border-cyan-500/50 bg-black/50 mx-auto";
+
+            // Header Row
+            const thead = document.createElement('thead');
+            let headerRow = `<tr><th class="p-2 border border-cyan-500/30"></th>`;
+            entities.cols.forEach(col => {
+                headerRow += `<th class="p-2 border border-cyan-500/30 text-cyan-300 font-cyber font-normal text-sm w-16 whitespace-nowrap overflow-hidden text-ellipsis px-1" title="${col}"><div class="-rotate-45 h-16 origin-bottom-left ml-4">${col}</div></th>`;
+            });
+            headerRow += `</tr>`;
+            thead.innerHTML = headerRow;
+            table.appendChild(thead);
+
+            // Body Rows
+            const tbody = document.createElement('tbody');
+            entities.rows.forEach((row, rIdx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<th class="p-2 border border-cyan-500/30 text-purple-300 font-cyber font-normal text-sm text-right pr-4">${row}</th>`;
+                
+                entities.cols.forEach((col, cIdx) => {
+                    const td = document.createElement('td');
+                    td.className = "border border-cyan-500/30 p-0 text-center align-middle";
+                    
+                    const cell = document.createElement('div');
+                    cell.className = "logic-grid-cell flex items-center justify-center text-xl";
+                    cell.dataset.r = rIdx;
+                    cell.dataset.c = cIdx;
+                    
+                    // Initialize state
+                    gameState.gridState[`${rIdx}-${cIdx}`] = 0;
+                    
+                    cell.onclick = () => handleCellClick(cell, rIdx, cIdx);
+                    td.appendChild(cell);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            ws.appendChild(table);
+        }
+
+        function handleCellClick(cell, r, c) {
+            playSound('click');
+            const key = `${r}-${c}`;
+            let state = gameState.gridState[key];
+            
+            // Cycle: 0(empty) -> 1(X) -> 2(O) -> 0
+            state = (state + 1) % 3;
+            gameState.gridState[key] = state;
+
+            cell.classList.remove('cell-state-x', 'cell-state-o');
+            if (state === 0) {
+                cell.innerHTML = '';
+            } else if (state === 1) {
+                cell.innerHTML = '✕';
+                cell.classList.add('cell-state-x');
+            } else if (state === 2) {
+                cell.innerHTML = '✔';
+                cell.classList.add('cell-state-o');
+                
+                // Optional QoL: Auto-cross out row/col when O is placed
+                autoCrossOut(r, c);
+            }
+        }
+
+        function autoCrossOut(row, col) {
+            const currentCase = cases.find(c => c.id === gameState.activeCaseId);
+            const rLen = currentCase.entities.rows.length;
+            const cLen = currentCase.entities.cols.length;
+
+            for(let i=0; i<rLen; i++) {
+                if (i !== parseInt(row)) {
+                    updateCellVisual(i, col, 1);
+                }
+            }
+            for(let j=0; j<cLen; j++) {
+                if (j !== parseInt(col)) {
+                    updateCellVisual(row, j, 1);
+                }
+            }
+        }
+
+        function updateCellVisual(r, c, newState) {
+            const key = `${r}-${c}`;
+            // Don't overwrite existing 'O's (user logic error, let them find it)
+            if (gameState.gridState[key] === 2) return; 
+            
+            gameState.gridState[key] = newState;
+            const cell = document.querySelector(`.logic-grid-cell[data-r="${r}"][data-c="${c}"]`);
+            if (cell) {
+                cell.classList.remove('cell-state-x', 'cell-state-o');
+                if (newState === 1) {
+                    cell.innerHTML = '✕';
+                    cell.classList.add('cell-state-x');
+                }
+            }
+        }
+
+        // --- STREAMING_CHUNK:Validation & Game Over Logic ---
+
+        function checkAnswer() {
+            const currentCase = cases.find(c => c.id === gameState.activeCaseId);
+            const rows = currentCase.entities.rows;
+            const targetSol = currentCase.solution; // e.g., { "นนท์": 2 }
+            
+            let isCorrect = true;
+            let completeSelections = 0;
+
+            rows.forEach((rowName, rIdx) => {
+                const targetColIdx = targetSol[rowName];
+                
+                // Check what user selected for this row
+                let selectedColIdx = -1;
+                for(let c=0; c < currentCase.entities.cols.length; c++) {
+                    if (gameState.gridState[`${rIdx}-${c}`] === 2) {
+                        if (selectedColIdx !== -1) {
+                            // Multiple selections in a row (invalid state)
+                            isCorrect = false; 
+                        }
+                        selectedColIdx = c;
+                    }
+                }
+
+                if (selectedColIdx !== -1) completeSelections++;
+                if (selectedColIdx !== targetColIdx) isCorrect = false;
+            });
+
+            if (completeSelections < rows.length) {
+                showToast("คุณยังวิเคราะห์ข้อมูลไม่ครบทุกเป้าหมาย", "warning");
+                playSound('error');
+                return;
+            }
+
+            if (isCorrect) {
+                handleVictory(currentCase);
+            } else {
+                handleWrongAnswer();
+            }
+        }
+
+        function handleWrongAnswer() {
+            playSound('error');
+            gameState.lives--;
+            updateLivesUI();
+            
+            const board = document.getElementById('logic-workspace');
+            board.classList.add('border-red-500', 'shadow-[0_0_30px_rgba(255,0,0,0.5)]');
+            setTimeout(() => {
+                board.classList.remove('border-red-500', 'shadow-[0_0_30px_rgba(255,0,0,0.5)]');
+            }, 500);
+
+            if (gameState.lives <= 0) {
+                handleGameOver("ข้อสันนิษฐานผิดพลาดคดีนี้ล้มเหลว");
+            } else {
+                showToast(`ทฤษฎีของคุณมีช่องโหว่ (เหลือ ${gameState.lives} ครั้ง)`, "error");
+            }
+        }
+
+        function handleGameOver(reason) {
+            clearInterval(gameState.timerInterval);
+            playSound('error');
+            alert(`GAME OVER: ${reason}\n\nระบบจะทำการรีเซ็ตคดีนี้`); // Minimal use of alert for hard stop
+            navTo('cases');
+        }
+
+        function handleVictory(currentCase) {
+            clearInterval(gameState.timerInterval);
+            playSound('success');
+            
+            // Calculate Score
+            const baseScore = 500;
+            const timeBonus = gameState.timeRemaining * 2;
+            const hintPenalty = gameState.hintsUsed * 50;
+            const lifeBonus = (gameState.lives - 1) * 100;
+            const totalScore = Math.max(100, baseScore + timeBonus - hintPenalty + lifeBonus);
+
+            // Calculate Stars
+            let stars = 1;
+            if (gameState.lives === 3 && gameState.hintsUsed === 0 && gameState.timeRemaining > currentCase.timeLimit / 2) stars = 3;
+            else if (gameState.lives >= 2 && gameState.hintsUsed <= 1) stars = 2;
+
+            // Update Progress & Profile
+            if (!gameState.progress[currentCase.id] || gameState.progress[currentCase.id].score < totalScore) {
+                
+                // If first time solving
+                if (!gameState.progress[currentCase.id]) {
+                    gameState.player.casesSolved++;
+                }
+
+                // Adjust total score diff
+                const oldScore = gameState.progress[currentCase.id] ? gameState.progress[currentCase.id].score : 0;
+                gameState.player.score += (totalScore - oldScore);
+                
+                // Adjust stars diff
+                const oldStars = gameState.progress[currentCase.id] ? gameState.progress[currentCase.id].stars : 0;
+                if (stars > oldStars) {
+                    gameState.player.stars += (stars - oldStars);
+                }
+
+                gameState.progress[currentCase.id] = { score: totalScore, stars: stars };
+            }
+
+            updateRank();
+
+            // Setup Result Screen
+            document.getElementById('result-score').innerText = `+${totalScore}`;
+            document.getElementById('result-time').innerText = formatTime(currentCase.timeLimit - gameState.timeRemaining);
+            document.getElementById('result-learning').innerText = currentCase.learningObjective;
+            
+            const starsContainer = document.getElementById('result-stars');
+            starsContainer.innerHTML = '';
+            for(let i=0; i<3; i++) {
+                setTimeout(() => {
+                    playSound('click');
+                    starsContainer.innerHTML += `<i class="ph-fill ph-star ${i < stars ? 'text-yellow-400 drop-shadow-[0_0_10px_yellow] scale-125' : 'text-gray-600'} transition-transform"></i>`;
+                }, i * 300);
+            }
+
+            // Setup Next Button
+            const nextBtn = document.getElementById('next-case-btn');
+            if (currentCase.id < cases.length) {
+                nextBtn.style.display = 'block';
+                nextBtn.onclick = () => {
+                    document.getElementById('screen-result').classList.remove('active');
+                    startGame(currentCase.id + 1);
+                };
+            } else {
+                nextBtn.style.display = 'none';
+            }
+
+            // Show result modal (overlaying game)
+            document.getElementById('screen-result').classList.add('active');
+        }
+
+    </script>
+</body>
+</html>
